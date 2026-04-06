@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { geminiCall } from '../lib/gemini'
+import { searchWatchDataGrounded, searchWatchImageGrounded } from '../lib/gemini'
 import { findWorkingImageUrl, genId } from '../utils/imageUtils'
 import { dbUpsert } from '../lib/supabase'
 
@@ -32,24 +32,21 @@ export default function AddWatchModal({ open, onClose, currentPage, user, onWatc
     setError('')
     setSearching(true)
     try {
-      const systemPrompt = `You are a watch encyclopedia. Identify the exact watch and return ONLY valid JSON, no markdown, no preamble.
-Required keys: brand, model, ref (or ""), year (or ""), dial, case_diameter, case_thickness, case_material, crystal, movement, power_reserve, water_resistance, lug_width, bracelet, description (2-3 sentences), image_urls (array of 5+ direct .jpg/.png/.webp URLs from Jomashop CDN, Chrono24 CDN, official brand sites, or Wikipedia Commons).
-JSON only.`
-      const text = await geminiCall(systemPrompt, `Find specs and images for: ${query}`, user)
-      const info = JSON.parse(text.replace(/```json|```/g, '').trim())
+      // Grounded call — searches real-time web for specs, works for new releases too
+      const info = await searchWatchDataGrounded(query, user)
       setPendingData(info)
       setStep(2)
 
-      // Try to resolve a working image in the background
-      const candidates = Array.isArray(info.image_urls) ? info.image_urls
-        : info.image_url ? [info.image_url] : []
+      // Search for image in parallel — grounded for real URLs, falls back if needed
       setPreviewImgSrc('')
-      findWorkingImageUrl(candidates).then(working => {
+      ;(async () => {
+        let working = await searchWatchImageGrounded(info.brand, info.model, info.ref, user)
+        if (!working) working = await findWorkingImageUrl(info.image_urls || [])
         if (working) {
           info.resolved_image = working
           setPreviewImgSrc(working)
         }
-      })
+      })()
     } catch (err) {
       setError(err.message || 'Search failed. Try again.')
     }

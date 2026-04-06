@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { geminiCall } from '../lib/gemini'
+import { geminiCall, searchWatchImageGrounded, searchWatchDataGrounded } from '../lib/gemini'
 import { findWorkingImageUrl, tryWikipediaImage, compressImage } from '../utils/imageUtils'
 import { dbUpsert } from '../lib/supabase'
 
@@ -64,12 +64,21 @@ export default function ProfileModal({ watchId, watches, user, onClose, onDelete
   async function fetchSpecs(w) {
     const query = `${w.brand} ${w.model} ${w.ref || ''}`.trim()
     try {
-      const text = await geminiCall(
-        `You are a watch encyclopedia. Return ONLY a valid JSON object (no markdown) with keys: case_diameter, case_thickness, case_material, crystal, movement, power_reserve, water_resistance, lug_width, dial, bracelet, description. Use "—" for unknown values.`,
-        `Specifications for: ${query}`,
-        user
-      )
-      const specs = JSON.parse(text.replace(/```json|```/g, '').trim())
+      // Grounded call — searches real-time web, handles new releases beyond training cutoff
+      const data  = await searchWatchDataGrounded(query, user)
+      const specs = {
+        case_diameter:    data.case_diameter    || '—',
+        case_thickness:   data.case_thickness   || '—',
+        case_material:    data.case_material    || '—',
+        crystal:          data.crystal          || '—',
+        movement:         data.movement         || '—',
+        power_reserve:    data.power_reserve    || '—',
+        water_resistance: data.water_resistance || '—',
+        lug_width:        data.lug_width        || '—',
+        dial:             data.dial             || '—',
+        bracelet:         data.bracelet         || '—',
+        description:      data.description      || '',
+      }
       const updated = { ...w, specs }
       await dbUpsert(updated, user.id)
       onWatchUpdated(updated)
@@ -138,14 +147,18 @@ export default function ProfileModal({ watchId, watches, user, onClose, onDelete
     setSearchingImg(true)
     const query = `${watch.brand} ${watch.model}${watch.ref ? ' ' + watch.ref : ''}`
     try {
-      const text = await geminiCall(
-        `Return ONLY JSON: { "image_urls": [...] } with 6-8 direct product image URLs (.jpg/.png/.webp) for the watch. Use Jomashop CDN, Chrono24 CDN, official brand sites, Wikipedia Commons. JSON only.`,
-        `Find product image URLs for: ${query}`,
-        user
-      )
-      const info = JSON.parse(text.replace(/```json|```/g, '').trim())
-      const candidates = Array.isArray(info.image_urls) ? info.image_urls : []
-      let working = await findWorkingImageUrl(candidates)
+      // Try grounded search first (real-time Google), then fall back to ungrounded + Wikipedia
+      let working = await searchWatchImageGrounded(watch.brand, watch.model, watch.ref, user)
+      if (!working) {
+        const text = await geminiCall(
+          `Return ONLY JSON: { "image_urls": [...] } with 6-8 direct product image URLs (.jpg/.png/.webp) for the watch. Use Jomashop CDN, Chrono24 CDN, official brand sites, Wikipedia Commons. JSON only.`,
+          `Find product image URLs for: ${query}`,
+          user
+        )
+        const info = JSON.parse(text.replace(/```json|```/g, '').trim())
+        const candidates = Array.isArray(info.image_urls) ? info.image_urls : []
+        working = await findWorkingImageUrl(candidates)
+      }
       if (!working) working = await tryWikipediaImage(query)
       if (working) {
         const updated = { ...watch, image: working }
