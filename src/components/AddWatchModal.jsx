@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { searchWatchDataGrounded } from '../lib/gemini'
-import { genId, tryWikipediaImage } from '../utils/imageUtils'
+import { genId } from '../utils/imageUtils'
 import { dbUpsert } from '../lib/supabase'
 
 export default function AddWatchModal({ open, onClose, currentPage, user, onWatchAdded, showToast }) {
@@ -37,16 +37,6 @@ export default function AddWatchModal({ open, onClose, currentPage, user, onWatc
       setPendingData(info)
       setStep(2)
 
-      // Search Wikipedia for a watch image in the background
-      setPreviewImgSrc('')
-      ;(async () => {
-        // Wikipedia articles exist at brand+model level, not by ref number
-        const url = await tryWikipediaImage(`${info.brand} ${info.model}`)
-        if (url) {
-          info.resolved_image = url
-          setPreviewImgSrc(url)
-        }
-      })()
     } catch (err) {
       setError(err.message || 'Search failed. Try again.')
     }

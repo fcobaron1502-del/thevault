@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { searchWatchDataGrounded } from '../lib/gemini'
-import { tryWikipediaImage, compressImage } from '../utils/imageUtils'
+import { compressImage } from '../utils/imageUtils'
 import { dbUpsert } from '../lib/supabase'
 
 const SPEC_FIELDS = [
@@ -27,7 +27,6 @@ export default function ProfileModal({ watchId, watches, user, onClose, onDelete
   const [imgPopoverOpen, setImgPopoverOpen] = useState(false)
   const [urlPanelOpen, setUrlPanelOpen]     = useState(false)
   const [urlInput, setUrlInput]             = useState('')
-  const [searchingImg, setSearchingImg]     = useState(false)
   const fileInputRef  = useRef(null)
   const popoverRef    = useRef(null)
 
@@ -142,26 +141,6 @@ export default function ProfileModal({ watchId, watches, user, onClose, onDelete
     }
   }
 
-  async function searchInternetImage() {
-    if (!watch) return
-    setSearchingImg(true)
-    // Wikipedia articles exist at brand+model level, not by ref number
-    try {
-      const url = await tryWikipediaImage(`${watch.brand} ${watch.model}`)
-      if (url) {
-        const updated = { ...watch, image: url }
-        await dbUpsert(updated, user.id)
-        onWatchUpdated(updated)
-        setImgPopoverOpen(false)
-        showToast('✓ Image found')
-      } else {
-        showToast('No image found on Wikipedia', 'error')
-      }
-    } catch (e) {
-      showToast('Search failed: ' + e.message, 'error')
-    }
-    setSearchingImg(false)
-  }
 
   if (!open || !watch) return null
 
@@ -216,13 +195,6 @@ export default function ProfileModal({ watchId, watches, user, onClose, onDelete
             </button>
 
             <div ref={popoverRef} className={`img-popover${imgPopoverOpen ? ' open' : ''}`}>
-              <button className="img-popover-item" onClick={searchInternetImage} disabled={searchingImg}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-                {searchingImg ? 'Searching…' : 'Search Internet'}
-              </button>
-
               <label className="img-popover-item img-file-wrap" style={{ cursor:'pointer' }}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
