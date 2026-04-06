@@ -33,11 +33,13 @@ export default function App() {
     )
   }, [])
 
-  // Single auth listener — onAuthStateChange fires INITIAL_SESSION on page
-  // refresh with the existing session, so no separate getSession() call needed.
+  // Auth listener — kept intentionally synchronous.
+  // Any async work (DB reads, token fetches) inside onAuthStateChange holds the
+  // Supabase auth lock for its entire duration, which deadlocks subsequent writes.
+  // Solution: set state only, let a separate useEffect react to the user change.
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (event === 'SIGNED_OUT') {
           setUser(null)
           setWatches([])
@@ -46,20 +48,23 @@ export default function App() {
         }
         if (session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
           setUser(session.user)
-          // Fire-and-forget: fetchGeminiKey may call supabase.auth.getUser() internally.
-          // Awaiting it inside onAuthStateChange holds the auth lock and deadlocks
-          // subsequent Supabase API calls (including upserts). Detach it instead.
-          fetchGeminiKey(session.user).then(keyOk => {
-            if (!keyOk) showToast('⚠ Gemini key not set in account metadata', 'error')
-          })
-          const { data } = await supabase
-            .from('watches').select('*').order('ts', { ascending: false })
-          setWatches(data || [])
         }
       }
     )
     return () => subscription.unsubscribe()
-  }, [showToast])
+  }, [])
+
+  // Load watches + Gemini key whenever the logged-in user changes.
+  // Runs outside the auth lock so Supabase writes are never blocked.
+  useEffect(() => {
+    if (!user) return
+    fetchGeminiKey(user).then(keyOk => {
+      if (!keyOk) showToast('⚠ Gemini key not set in account metadata', 'error')
+    })
+    supabase
+      .from('watches').select('*').order('ts', { ascending: false })
+      .then(({ data }) => setWatches(data || []))
+  }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keyboard shortcut: Escape closes all modals
   useEffect(() => {
