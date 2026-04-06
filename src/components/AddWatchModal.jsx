@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { searchWatchDataGrounded, searchWatchImageGrounded } from '../lib/gemini'
-import { genId } from '../utils/imageUtils'
+import { searchWatchDataGrounded } from '../lib/gemini'
+import { genId, tryWikipediaImage } from '../utils/imageUtils'
 import { dbUpsert } from '../lib/supabase'
 
 export default function AddWatchModal({ open, onClose, currentPage, user, onWatchAdded, showToast }) {
@@ -37,16 +37,14 @@ export default function AddWatchModal({ open, onClose, currentPage, user, onWatc
       setPendingData(info)
       setStep(2)
 
-      // Search for image in parallel — grounded for real URLs, falls back if needed
+      // Search Wikipedia for a watch image in the background
       setPreviewImgSrc('')
       ;(async () => {
-        let working = await searchWatchImageGrounded(info.brand, info.model, info.ref, user)
-        // Fallback: use first URL from specs data (skip client-side testing — hotlink
-        // protection on retailer sites causes false negatives with new Image())
-        if (!working) working = (info.image_urls || [])[0] || null
-        if (working) {
-          info.resolved_image = working
-          setPreviewImgSrc(working)
+        const query = `${info.brand} ${info.model}${info.ref ? ' ' + info.ref : ''}`
+        const url = await tryWikipediaImage(query)
+        if (url) {
+          info.resolved_image = url
+          setPreviewImgSrc(url)
         }
       })()
     } catch (err) {

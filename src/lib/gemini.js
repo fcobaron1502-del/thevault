@@ -77,29 +77,3 @@ Use "—" for any value you cannot confirm from search results. JSON only.`
   return JSON.parse(text.replace(/```json|```/g, '').trim())
 }
 
-// Grounded image search: uses real-time Google Search to find product image URLs.
-// Asks for multiple candidates, then tests each to return the first working one.
-// groundingChunks from the response confirm the model searched real web pages —
-// the URLs in the JSON come from those actual pages, not hallucinated memory.
-export async function searchWatchImageGrounded(brand, model, ref, user) {
-  const watchName   = `${brand} ${model}${ref ? ' ' + ref : ''}`
-  const systemPrompt = `Search the web for product photos of this watch on retailer and brand websites. Return ONLY valid JSON: { "image_urls": ["url1", "url2", "url3"] } with up to 3 direct image file URLs (.jpg, .png, or .webp) found in the search results. These must be direct links to image files from Jomashop, Chrono24, WatchBox, official brand sites, or similar. JSON only, no markdown.`
-  try {
-    const { text, groundingChunks } = await geminiCallRaw(
-      systemPrompt,
-      `Find product images for: ${watchName}`,
-      user,
-      true
-    )
-    const info       = JSON.parse(text.replace(/```json|```/g, '').trim())
-    const candidates = Array.isArray(info.image_urls) ? info.image_urls
-      : info.image_url ? [info.image_url] : []
-
-    // Return the first URL directly — client-side image testing (new Image()) fails
-    // for most retailer sites due to hotlink protection / CORS, producing false negatives.
-    // The <img> onError handler in WatchCard and the preview already handles broken URLs.
-    return candidates[0] || null
-  } catch {
-    return null
-  }
-}

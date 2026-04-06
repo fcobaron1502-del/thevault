@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { geminiCall, searchWatchImageGrounded, searchWatchDataGrounded } from '../lib/gemini'
-import { findWorkingImageUrl, tryWikipediaImage, compressImage } from '../utils/imageUtils'
+import { searchWatchDataGrounded } from '../lib/gemini'
+import { tryWikipediaImage, compressImage } from '../utils/imageUtils'
 import { dbUpsert } from '../lib/supabase'
 
 const SPEC_FIELDS = [
@@ -147,27 +147,15 @@ export default function ProfileModal({ watchId, watches, user, onClose, onDelete
     setSearchingImg(true)
     const query = `${watch.brand} ${watch.model}${watch.ref ? ' ' + watch.ref : ''}`
     try {
-      // Try grounded search first (real-time Google), then fall back to ungrounded + Wikipedia
-      let working = await searchWatchImageGrounded(watch.brand, watch.model, watch.ref, user)
-      if (!working) {
-        const text = await geminiCall(
-          `Return ONLY JSON: { "image_urls": [...] } with 6-8 direct product image URLs (.jpg/.png/.webp) for the watch. Use Jomashop CDN, Chrono24 CDN, official brand sites, Wikipedia Commons. JSON only.`,
-          `Find product image URLs for: ${query}`,
-          user
-        )
-        const info = JSON.parse(text.replace(/```json|```/g, '').trim())
-        const candidates = Array.isArray(info.image_urls) ? info.image_urls : []
-        working = await findWorkingImageUrl(candidates)
-      }
-      if (!working) working = await tryWikipediaImage(query)
-      if (working) {
-        const updated = { ...watch, image: working }
+      const url = await tryWikipediaImage(query)
+      if (url) {
+        const updated = { ...watch, image: url }
         await dbUpsert(updated, user.id)
         onWatchUpdated(updated)
         setImgPopoverOpen(false)
         showToast('✓ Image found')
       } else {
-        showToast('No image found', 'error')
+        showToast('No image found on Wikipedia', 'error')
       }
     } catch (e) {
       showToast('Search failed: ' + e.message, 'error')
