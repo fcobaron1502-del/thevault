@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { searchWatchDataGrounded, searchWatchImageGrounded } from '../lib/gemini'
-import { findWorkingImageUrl, genId } from '../utils/imageUtils'
+import { genId } from '../utils/imageUtils'
 import { dbUpsert } from '../lib/supabase'
 
 export default function AddWatchModal({ open, onClose, currentPage, user, onWatchAdded, showToast }) {
@@ -41,7 +41,9 @@ export default function AddWatchModal({ open, onClose, currentPage, user, onWatc
       setPreviewImgSrc('')
       ;(async () => {
         let working = await searchWatchImageGrounded(info.brand, info.model, info.ref, user)
-        if (!working) working = await findWorkingImageUrl(info.image_urls || [])
+        // Fallback: use first URL from specs data (skip client-side testing — hotlink
+        // protection on retailer sites causes false negatives with new Image())
+        if (!working) working = (info.image_urls || [])[0] || null
         if (working) {
           info.resolved_image = working
           setPreviewImgSrc(working)

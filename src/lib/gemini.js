@@ -1,5 +1,4 @@
 import { supabase } from './supabase'
-import { findWorkingImageUrl } from '../utils/imageUtils'
 
 const GEMINI_MODEL = 'gemini-2.5-flash'
 const GEMINI_BASE  = 'https://generativelanguage.googleapis.com/v1beta/models'
@@ -96,13 +95,10 @@ export async function searchWatchImageGrounded(brand, model, ref, user) {
     const candidates = Array.isArray(info.image_urls) ? info.image_urls
       : info.image_url ? [info.image_url] : []
 
-    // groundingChunks prove the model searched real pages.
-    // Log sources in dev for transparency — unused at runtime.
-    if (import.meta.env.DEV && groundingChunks.length) {
-      console.debug('[Vault] Image grounding sources:', groundingChunks.map(c => c.web?.uri))
-    }
-
-    return await findWorkingImageUrl(candidates)
+    // Return the first URL directly — client-side image testing (new Image()) fails
+    // for most retailer sites due to hotlink protection / CORS, producing false negatives.
+    // The <img> onError handler in WatchCard and the preview already handles broken URLs.
+    return candidates[0] || null
   } catch {
     return null
   }
