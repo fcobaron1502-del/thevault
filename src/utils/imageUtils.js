@@ -26,13 +26,17 @@ export async function findWorkingImageUrl(urls) {
 
 export async function tryWikipediaImage(query) {
   try {
-    const resp = await fetch(
-      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query.replace(/ /g, '_'))}`
-    )
+    const apiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query.replace(/ /g, '_'))}`
+    console.log('[Wiki] fetching:', apiUrl)
+    const resp = await fetch(apiUrl)
     const data = await resp.json()
+    console.log('[Wiki] response:', data?.title, '| thumbnail:', data?.thumbnail?.source)
     const url = data?.thumbnail?.source || data?.originalimage?.source
-    if (url && await testImageUrl(url)) return url
-  } catch {}
+    if (!url) { console.log('[Wiki] no image in response'); return null }
+    const works = await testImageUrl(url)
+    console.log('[Wiki] testImageUrl:', works)
+    if (works) return url
+  } catch (e) { console.error('[Wiki] error:', e) }
   return null
 }
 
