@@ -46,8 +46,12 @@ export default function App() {
         }
         if (session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
           setUser(session.user)
-          const keyOk = await fetchGeminiKey(session.user)
-          if (!keyOk) showToast('⚠ Gemini key not set in account metadata', 'error')
+          // Fire-and-forget: fetchGeminiKey may call supabase.auth.getUser() internally.
+          // Awaiting it inside onAuthStateChange holds the auth lock and deadlocks
+          // subsequent Supabase API calls (including upserts). Detach it instead.
+          fetchGeminiKey(session.user).then(keyOk => {
+            if (!keyOk) showToast('⚠ Gemini key not set in account metadata', 'error')
+          })
           const { data } = await supabase
             .from('watches').select('*').order('ts', { ascending: false })
           setWatches(data || [])
