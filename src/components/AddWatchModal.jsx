@@ -55,6 +55,7 @@ export default function AddWatchModal({ open, onClose, currentPage, user, onWatc
 
   async function confirmAdd() {
     if (!pendingData) return
+    if (!user) { setError('Not signed in — please refresh and try again.'); return }
     setSaving(true)
     const d = pendingData
     const watch = {
@@ -82,11 +83,14 @@ export default function AddWatchModal({ open, onClose, currentPage, user, onWatc
       },
       ts: Date.now(),
     }
+    console.log('[AddWatch] saving watch, user.id=', user.id, 'watch.id=', watch.id)
     try {
       await dbUpsert(watch, user.id)
+      console.log('[AddWatch] dbUpsert succeeded')
       onWatchAdded(watch, selectedList)
       onClose()
     } catch (e) {
+      console.error('[AddWatch] dbUpsert failed:', e)
       setError('Save failed: ' + e.message)
     }
     setSaving(false)
