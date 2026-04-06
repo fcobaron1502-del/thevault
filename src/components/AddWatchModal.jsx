@@ -40,8 +40,8 @@ export default function AddWatchModal({ open, onClose, currentPage, user, onWatc
       // Search Wikipedia for a watch image in the background
       setPreviewImgSrc('')
       ;(async () => {
-        const query = `${info.brand} ${info.model}${info.ref ? ' ' + info.ref : ''}`
-        const url = await tryWikipediaImage(query)
+        // Wikipedia articles exist at brand+model level, not by ref number
+        const url = await tryWikipediaImage(`${info.brand} ${info.model}`)
         if (url) {
           info.resolved_image = url
           setPreviewImgSrc(url)

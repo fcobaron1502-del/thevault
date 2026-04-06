@@ -145,9 +145,9 @@ export default function ProfileModal({ watchId, watches, user, onClose, onDelete
   async function searchInternetImage() {
     if (!watch) return
     setSearchingImg(true)
-    const query = `${watch.brand} ${watch.model}${watch.ref ? ' ' + watch.ref : ''}`
+    // Wikipedia articles exist at brand+model level, not by ref number
     try {
-      const url = await tryWikipediaImage(query)
+      const url = await tryWikipediaImage(`${watch.brand} ${watch.model}`)
       if (url) {
         const updated = { ...watch, image: url }
         await dbUpsert(updated, user.id)
