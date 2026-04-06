@@ -83,14 +83,11 @@ export default function AddWatchModal({ open, onClose, currentPage, user, onWatc
       },
       ts: Date.now(),
     }
-    console.log('[AddWatch] saving watch, user.id=', user.id, 'watch.id=', watch.id)
     try {
       await dbUpsert(watch, user.id)
-      console.log('[AddWatch] dbUpsert succeeded')
       onWatchAdded(watch, selectedList)
       onClose()
     } catch (e) {
-      console.error('[AddWatch] dbUpsert failed:', e)
       setError('Save failed: ' + e.message)
     }
     setSaving(false)
