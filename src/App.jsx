@@ -33,8 +33,27 @@ export default function App() {
     )
   }, [])
 
-  // Auth state listener
+  const loadWatches = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('watches').select('*').order('ts', { ascending: false })
+    if (error) {
+      showToast('Could not load watches: ' + error.message, 'error')
+    } else {
+      setWatches(data || [])
+    }
+  }, [showToast])
+
+  // Auth state listener + initial session check on mount
   useEffect(() => {
+    // Check for an existing session immediately on mount (handles page refresh)
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        setUser(session.user)
+        await fetchGeminiKey(session.user)
+        await loadWatches()
+      }
+    })
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === 'SIGNED_OUT') {
@@ -43,18 +62,17 @@ export default function App() {
           localStorage.removeItem('gemini_api_key')
           return
         }
-        if (session?.user && event !== 'TOKEN_REFRESHED') {
+        // SIGNED_IN fires on fresh login, INITIAL_SESSION on page refresh
+        if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
           setUser(session.user)
           const keyOk = await fetchGeminiKey(session.user)
           if (!keyOk) showToast('⚠ Gemini key not set in account metadata', 'error')
-          const { data, error } = await supabase
-            .from('watches').select('*').order('ts', { ascending: false })
-          if (!error) setWatches(data || [])
+          await loadWatches()
         }
       }
     )
     return () => subscription.unsubscribe()
-  }, [showToast])
+  }, [showToast, loadWatches])
 
   // Keyboard shortcut: Escape closes all modals
   useEffect(() => {
