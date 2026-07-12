@@ -2,7 +2,6 @@ import { supabase } from './supabase'
 
 const GEMINI_MODEL = 'gemini-2.5-flash'
 const GEMINI_BASE  = 'https://generativelanguage.googleapis.com/v1beta/models'
-const CORS_PROXY   = 'https://corsproxy.io/?'
 
 export function getApiKey(user) {
   if (user?.user_metadata?.gemini_key) return user.user_metadata.gemini_key
@@ -34,31 +33,26 @@ async function geminiCallRaw(systemPrompt, userPrompt, user, useGrounding = fals
   const key = getApiKey(user)
   if (!key) throw new Error('No Gemini key. Open Settings to reload it.')
 
-  const apiUrl = `${GEMINI_BASE}/${GEMINI_MODEL}:generateContent?key=${key}`
   const requestBody = {
     contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
   }
   if (useGrounding) {
     requestBody.tools = [{ google_search: {} }]
   }
-  const body    = JSON.stringify(requestBody)
-  const headers = { 'Content-Type': 'application/json' }
-  const urls    = useGrounding ? [apiUrl] : [apiUrl, CORS_PROXY + encodeURIComponent(apiUrl)]
 
-  for (const url of urls) {
-    try {
-      const resp = await fetch(url, { method: 'POST', headers, body })
-      const data = await resp.json()
-      if (data.error) throw new Error(`Gemini: ${data.error.message}`)
-      const candidate      = data.candidates?.[0]
-      const text           = candidate?.content?.parts?.filter(p => p.text)?.map(p => p.text)?.join('') || ''
-      const groundingChunks = candidate?.groundingMetadata?.groundingChunks || []
-      if (!text) throw new Error('Empty response. Try again.')
-      return { text, groundingChunks }
-    } catch (e) {
-      if (url === urls[urls.length - 1]) throw e
-    }
-  }
+  // Key goes in a header, never the URL, so it can't leak via logs or history.
+  const resp = await fetch(`${GEMINI_BASE}/${GEMINI_MODEL}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+    body: JSON.stringify(requestBody),
+  })
+  const data = await resp.json()
+  if (data.error) throw new Error(`Gemini: ${data.error.message}`)
+  const candidate       = data.candidates?.[0]
+  const text            = candidate?.content?.parts?.filter(p => p.text)?.map(p => p.text)?.join('') || ''
+  const groundingChunks = candidate?.groundingMetadata?.groundingChunks || []
+  if (!text) throw new Error('Empty response. Try again.')
+  return { text, groundingChunks }
 }
 
 // Standard text call — returns just the text string (backwards-compatible).
@@ -74,6 +68,26 @@ export async function searchWatchDataGrounded(query, user) {
 Required keys: brand, model, ref (or ""), year (or ""), dial, case_diameter, case_thickness, case_material, crystal, movement, power_reserve, water_resistance, lug_width, bracelet, description (2-3 sentences).
 Use "—" for any value you cannot confirm from search results. JSON only.`
   const { text } = await geminiCallRaw(systemPrompt, `Find specs for: ${query}`, user, true)
-  return JSON.parse(text.replace(/```json|```/g, '').trim())
+  // Grounded responses sometimes add preamble despite instructions — extract the JSON object.
+  const match = text.match(/\{[\s\S]*\}/)
+  if (!match) throw new Error('Could not read watch data from the response. Try again.')
+  return JSON.parse(match[0])
+}
+
+// Normalize raw Gemini output into the specs shape stored on a watch row.
+export function normalizeSpecs(data) {
+  return {
+    case_diameter:    data.case_diameter    || '—',
+    case_thickness:   data.case_thickness   || '—',
+    case_material:    data.case_material    || '—',
+    crystal:          data.crystal          || '—',
+    movement:         data.movement         || '—',
+    power_reserve:    data.power_reserve    || '—',
+    water_resistance: data.water_resistance || '—',
+    lug_width:        data.lug_width        || '—',
+    dial:             data.dial             || '—',
+    bracelet:         data.bracelet         || '—',
+    description:      data.description      || '',
+  }
 }
 

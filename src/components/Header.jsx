@@ -1,8 +1,4 @@
 export default function Header({ user, currentPage, watchCount, onPageChange, onAddClick, onSettingsClick, onSignOut }) {
-  const label = currentPage === 'collection'
-    ? `${watchCount} piece${watchCount !== 1 ? 's' : ''}`
-    : `${watchCount} saved`
-
   return (
     <header>
       <div className="logo">

@@ -1,9 +1,20 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl  = import.meta.env.VITE_SUPABASE_URL  || 'https://aqalyjvslyevxfgbvhdz.supabase.co'
-const supabaseKey  = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxYWx5anZzbHlldnhmZ2J2aGR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyOTk3MzAsImV4cCI6MjA5MDg3NTczMH0.1_af0zGIjLiKxnsXwW6SBKMEAS6JerSW_dLgXedZljs'
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY — see .env.example')
+}
 
 export const supabase = createClient(supabaseUrl, supabaseKey)
+
+export async function dbUpsertMany(rows) {
+  const { error } = await supabase
+    .from('watches')
+    .upsert(rows, { onConflict: 'id' })
+  if (error) throw error
+}
 
 export async function dbUpsert(watch, userId) {
   const { error } = await supabase

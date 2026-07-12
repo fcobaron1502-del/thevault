@@ -1,22 +1,25 @@
-export default function WatchCard({ watch, index, onOpen, onDelete }) {
+import { useState, useEffect, memo } from 'react'
+
+function WatchCard({ watch, index, onOpen, onDelete }) {
+  const [imgFailed, setImgFailed] = useState(false)
   const meta = [watch.ref, watch.year, watch.dial].filter(Boolean).join(' · ')
+
+  // Give a new image URL a fresh chance after a previous one failed
+  useEffect(() => { setImgFailed(false) }, [watch.image])
 
   return (
     <div
       className="watch-card"
-      style={{ animationDelay: `${index * 0.05}s` }}
+      style={{ animationDelay: `${Math.min(index, 20) * 0.05}s` }}
       onClick={() => onOpen(watch.id)}
     >
       <div className="card-img-wrap">
-        {watch.image ? (
+        {watch.image && !imgFailed ? (
           <img
             className="card-img"
             src={watch.image}
             alt={`${watch.brand} ${watch.model}`}
-            onError={e => {
-              e.target.parentElement.innerHTML =
-                '<div class="card-img-placeholder"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg><span>No Image</span></div>'
-            }}
+            onError={() => setImgFailed(true)}
           />
         ) : (
           <div className="card-img-placeholder">
@@ -25,7 +28,7 @@ export default function WatchCard({ watch, index, onOpen, onDelete }) {
               <line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/>
               <line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/>
             </svg>
-            <span>Click to view</span>
+            <span>{imgFailed ? 'No Image' : 'Click to view'}</span>
           </div>
         )}
         <div className="card-overlay">
@@ -51,3 +54,5 @@ export default function WatchCard({ watch, index, onOpen, onDelete }) {
     </div>
   )
 }
+
+export default memo(WatchCard)

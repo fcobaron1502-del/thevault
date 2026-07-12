@@ -33,6 +33,8 @@ export default function App() {
     )
   }, [])
 
+  useEffect(() => () => clearTimeout(toastTimerRef.current), [])
+
   // Auth listener — kept intentionally synchronous.
   // Any async work (DB reads, token fetches) inside onAuthStateChange holds the
   // Supabase auth lock for its entire duration, which deadlocks subsequent writes.
@@ -63,7 +65,10 @@ export default function App() {
     })
     supabase
       .from('watches').select('*').order('ts', { ascending: false })
-      .then(({ data }) => setWatches(data || []))
+      .then(({ data, error }) => {
+        if (error) { showToast('Could not load your vault: ' + error.message, 'error'); return }
+        setWatches(data || [])
+      })
   }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keyboard shortcut: Escape closes all modals
@@ -86,7 +91,7 @@ export default function App() {
       .filter(k => k.startsWith('sb-'))
       .forEach(k => localStorage.removeItem(k))
     localStorage.removeItem('gemini_api_key')
-    try { await supabase.auth.signOut() } catch {}
+    try { await supabase.auth.signOut() } catch { /* local state already cleared */ }
   }
 
   const handleWatchAdded = useCallback((watch, targetList) => {
@@ -101,6 +106,8 @@ export default function App() {
   const handleDeleteRequest = useCallback(id => {
     setConfirmDeleteId(id)
   }, [])
+
+  const openAddModal = useCallback(() => setAddModalOpen(true), [])
 
   const handleDeleteConfirm = useCallback(async () => {
     const id = confirmDeleteId
@@ -128,7 +135,7 @@ export default function App() {
             currentPage={currentPage}
             watchCount={watchCount}
             onPageChange={setCurrentPage}
-            onAddClick={() => setAddModalOpen(true)}
+            onAddClick={openAddModal}
             onSettingsClick={() => setSettingsOpen(true)}
             onSignOut={handleSignOut}
           />
@@ -138,7 +145,7 @@ export default function App() {
               currentPage={currentPage}
               onWatchClick={setProfileWatchId}
               onDeleteClick={handleDeleteRequest}
-              onAddClick={() => setAddModalOpen(true)}
+              onAddClick={openAddModal}
             />
           </main>
         </>
@@ -150,7 +157,6 @@ export default function App() {
         currentPage={currentPage}
         user={user}
         onWatchAdded={handleWatchAdded}
-        showToast={showToast}
       />
 
       <ProfileModal

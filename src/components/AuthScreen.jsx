@@ -17,6 +17,7 @@ export default function AuthScreen() {
   }
 
   async function submitAuth() {
+    if (loading) return
     if (!email || !password) { showStatus('Please enter email and password.', 'error'); return }
     setLoading(true)
     try {
@@ -45,11 +46,6 @@ export default function AuthScreen() {
     showStatus('✓ Magic link sent! Check your email.', 'ok')
   }
 
-  const statusStyle = status ? {
-    ok:    { background:'rgba(201,168,76,0.1)',   color:'var(--gold)',   border:'1px solid rgba(201,168,76,0.3)' },
-    error: { background:'rgba(192,57,43,0.1)',    color:'#e74c3c',       border:'1px solid rgba(192,57,43,0.3)' },
-  }[status.type] : {}
-
   return (
     <div id="authScreen">
       <div className="auth-box">
@@ -64,7 +60,7 @@ export default function AuthScreen() {
           </div>
 
           {status && (
-            <div className="auth-status" style={statusStyle}>{status.msg}</div>
+            <div className={`auth-status status-${status.type}`}>{status.msg}</div>
           )}
 
           <div className="form-group">

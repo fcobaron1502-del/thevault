@@ -11,7 +11,7 @@ export default function ConfirmModal({ open, watchName, onCancel, onConfirm }) {
 
   return (
     <div className={`modal-backdrop${open ? ' open' : ''}`} onClick={e => { if (e.target === e.currentTarget) onCancel() }}>
-      <div className="modal-add" style={{ maxWidth: '360px' }}>
+      <div className="modal-add" style={{ maxWidth: '360px' }} role="dialog" aria-modal="true" aria-label="Confirm removal">
         <div className="modal-header">
           <div>
             <div className="modal-subtitle">Confirm Removal</div>
@@ -25,8 +25,7 @@ export default function ConfirmModal({ open, watchName, onCancel, onConfirm }) {
           <div className="modal-footer" style={{ marginTop: 0 }}>
             <button className="btn-secondary" onClick={onCancel}>Cancel</button>
             <button
-              className="btn-submit"
-              style={{ background:'rgba(192,57,43,0.15)', color:'#e74c3c', border:'1px solid rgba(192,57,43,0.35)' }}
+              className="btn-submit btn-danger"
               onClick={handleConfirm}
               disabled={loading}
             >

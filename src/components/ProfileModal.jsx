@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { searchWatchDataGrounded } from '../lib/gemini'
+import { searchWatchDataGrounded, normalizeSpecs } from '../lib/gemini'
 import { compressImage } from '../utils/imageUtils'
 import { dbUpsert } from '../lib/supabase'
 
@@ -64,21 +64,8 @@ export default function ProfileModal({ watchId, watches, user, onClose, onDelete
     const query = `${w.brand} ${w.model} ${w.ref || ''}`.trim()
     try {
       // Grounded call — searches real-time web, handles new releases beyond training cutoff
-      const data  = await searchWatchDataGrounded(query, user)
-      const specs = {
-        case_diameter:    data.case_diameter    || '—',
-        case_thickness:   data.case_thickness   || '—',
-        case_material:    data.case_material    || '—',
-        crystal:          data.crystal          || '—',
-        movement:         data.movement         || '—',
-        power_reserve:    data.power_reserve    || '—',
-        water_resistance: data.water_resistance || '—',
-        lug_width:        data.lug_width        || '—',
-        dial:             data.dial             || '—',
-        bracelet:         data.bracelet         || '—',
-        description:      data.description      || '',
-      }
-      const updated = { ...w, specs }
+      const data    = await searchWatchDataGrounded(query, user)
+      const updated = { ...w, specs: normalizeSpecs(data) }
       await dbUpsert(updated, user.id)
       onWatchUpdated(updated)
       setSpecsState('loaded')
@@ -154,7 +141,7 @@ export default function ProfileModal({ watchId, watches, user, onClose, onDelete
 
   return (
     <div className="modal-backdrop open" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal-profile">
+      <div className="modal-profile" role="dialog" aria-modal="true" aria-label={`${watch.brand} ${watch.model}`}>
         {/* Header */}
         <div className="modal-header" style={{ flexShrink: 0 }}>
           <div>
@@ -287,8 +274,8 @@ export default function ProfileModal({ watchId, watches, user, onClose, onDelete
             {savingNotes ? 'Saved ✓' : 'Save Notes'}
           </button>
           <button
-            className="btn-submit"
-            style={{ background:'rgba(192,57,43,0.15)', color:'#e74c3c', border:'1px solid rgba(192,57,43,0.3)', flex:0, padding:'8px 20px' }}
+            className="btn-submit btn-danger"
+            style={{ flex:0, padding:'8px 20px' }}
             onClick={() => { onClose(); onDeleteRequest(watch.id) }}
           >
             Remove

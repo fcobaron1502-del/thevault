@@ -1,14 +1,17 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, memo } from 'react'
 import WatchCard from './WatchCard'
 
-export default function Gallery({ watches, currentPage, onWatchClick, onDeleteClick, onAddClick }) {
+function Gallery({ watches, currentPage, onWatchClick, onDeleteClick, onAddClick }) {
   const [sort, setSort]              = useState('newest')
   const [activeBrand, setActiveBrand] = useState(null)
 
   // Reset brand filter when page changes
   useEffect(() => { setActiveBrand(null) }, [currentPage])
 
-  const pageWatches = watches.filter(w => w.list === currentPage)
+  const pageWatches = useMemo(
+    () => watches.filter(w => w.list === currentPage),
+    [watches, currentPage]
+  )
 
   const brands = useMemo(
     () => [...new Set(pageWatches.map(w => w.brand).filter(Boolean))].sort(),
@@ -97,3 +100,5 @@ export default function Gallery({ watches, currentPage, onWatchClick, onDeleteCl
     </>
   )
 }
+
+export default memo(Gallery)

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { fetchGeminiKey } from '../lib/gemini'
-import { supabase, dbUpsert } from '../lib/supabase'
+import { supabase, dbUpsertMany } from '../lib/supabase'
 import { genId } from '../utils/imageUtils'
 
 export default function SettingsModal({ open, onClose, user, watches, setWatches, showToast }) {
@@ -41,51 +41,38 @@ export default function SettingsModal({ open, onClose, user, watches, setWatches
 
     setImportStatus({ msg: `Importing ${data.length} watches…`, type: 'neutral' })
 
-    let success = 0, failed = 0
-    for (const w of data) {
-      try {
-        const row = {
-          id:    w.id    || genId(),
-          brand: w.brand || 'Unknown',
-          model: w.model || 'Unknown',
-          ref:   w.ref   || '',
-          year:  w.year  || '',
-          dial:  w.dial  || '',
-          list:  w.list  || 'collection',
-          image: w.image || '',
-          notes: w.notes || '',
-          specs: w.specs || null,
-          ts:    w.ts    || Date.now(),
-        }
-        await dbUpsert(row, user.id)
-        success++
-      } catch { failed++ }
-    }
+    const rows = data.map(w => ({
+      id:      w.id    || genId(),
+      brand:   w.brand || 'Unknown',
+      model:   w.model || 'Unknown',
+      ref:     w.ref   || '',
+      year:    w.year  || '',
+      dial:    w.dial  || '',
+      list:    w.list  || 'collection',
+      image:   w.image || '',
+      notes:   w.notes || '',
+      specs:   w.specs || null,
+      ts:      w.ts    || Date.now(),
+      user_id: user.id,
+    }))
 
-    setImportStatus({
-      msg: `✓ Imported ${success} watch${success !== 1 ? 'es' : ''}${failed ? ` (${failed} failed)` : ''}.`,
-      type: success > 0 ? 'ok' : 'error'
-    })
-
-    if (success > 0) {
+    try {
+      await dbUpsertMany(rows)
+      setImportStatus({ msg: `✓ Imported ${rows.length} watch${rows.length !== 1 ? 'es' : ''}.`, type: 'ok' })
       const { data: fresh } = await supabase.from('watches').select('*').order('ts', { ascending: false })
       if (fresh) setWatches(fresh)
       setTimeout(onClose, 1500)
+    } catch (err) {
+      setImportStatus({ msg: '❌ Import failed: ' + err.message, type: 'error' })
     }
 
     // Reset file input
     e.target.value = ''
   }
 
-  const statusColors = {
-    ok:      { background:'rgba(201,168,76,0.1)',    color:'var(--gold)',     border:'1px solid rgba(201,168,76,0.3)' },
-    error:   { background:'rgba(192,57,43,0.1)',     color:'#e74c3c',         border:'1px solid rgba(192,57,43,0.3)' },
-    neutral: { background:'rgba(255,255,255,0.05)',  color:'var(--text-dim)', border:'1px solid var(--border)' },
-  }
-
   return (
     <div className={`modal-backdrop${open ? ' open' : ''}`} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal-add" style={{ maxWidth: '480px' }}>
+      <div className="modal-add" style={{ maxWidth: '480px' }} role="dialog" aria-modal="true" aria-label="Settings">
         <div className="modal-header">
           <div>
             <div className="modal-subtitle">Configuration</div>
@@ -121,7 +108,7 @@ export default function SettingsModal({ open, onClose, user, watches, setWatches
           </div>
 
           {importStatus && (
-            <div className="auth-status" style={{ marginTop:'10px', display:'block', ...statusColors[importStatus.type] }}>
+            <div className={`auth-status status-${importStatus.type}`} style={{ marginTop:'10px', display:'block' }}>
               {importStatus.msg}
             </div>
           )}

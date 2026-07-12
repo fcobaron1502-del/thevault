@@ -1,17 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
-import { searchWatchDataGrounded } from '../lib/gemini'
+import { searchWatchDataGrounded, normalizeSpecs } from '../lib/gemini'
 import { genId } from '../utils/imageUtils'
 import { dbUpsert } from '../lib/supabase'
 
-export default function AddWatchModal({ open, onClose, currentPage, user, onWatchAdded, showToast }) {
-  const [step, setStep]                   = useState(1)
-  const [query, setQuery]                 = useState('')
-  const [selectedList, setSelectedList]   = useState('collection')
-  const [pendingData, setPendingData]     = useState(null)
-  const [previewImgSrc, setPreviewImgSrc] = useState('')
-  const [error, setError]                 = useState('')
-  const [searching, setSearching]         = useState(false)
-  const [saving, setSaving]               = useState(false)
+export default function AddWatchModal({ open, onClose, currentPage, user, onWatchAdded }) {
+  const [step, setStep]                 = useState(1)
+  const [query, setQuery]               = useState('')
+  const [selectedList, setSelectedList] = useState('collection')
+  const [pendingData, setPendingData]   = useState(null)
+  const [error, setError]               = useState('')
+  const [searching, setSearching]       = useState(false)
+  const [saving, setSaving]             = useState(false)
   const inputRef = useRef(null)
 
   // Sync selectedList with currentPage when modal opens
@@ -22,12 +21,12 @@ export default function AddWatchModal({ open, onClose, currentPage, user, onWatc
       setQuery('')
       setError('')
       setPendingData(null)
-      setPreviewImgSrc('')
       setTimeout(() => inputRef.current?.focus(), 100)
     }
   }, [open, currentPage])
 
   async function searchWatch() {
+    if (searching) return
     if (!query.trim()) { setError('Please enter a watch name.'); return }
     setError('')
     setSearching(true)
@@ -44,7 +43,7 @@ export default function AddWatchModal({ open, onClose, currentPage, user, onWatc
   }
 
   async function confirmAdd() {
-    if (!pendingData) return
+    if (saving || !pendingData) return
     if (!user) { setError('Not signed in — please refresh and try again.'); return }
     setSaving(true)
     const d = pendingData
@@ -56,21 +55,9 @@ export default function AddWatchModal({ open, onClose, currentPage, user, onWatc
       year:  d.year  || '',
       dial:  d.dial  || '',
       list:  selectedList,
-      image: d.resolved_image || '',
+      image: '',
       notes: '',
-      specs: {
-        case_diameter:    d.case_diameter    || '—',
-        case_thickness:   d.case_thickness   || '—',
-        case_material:    d.case_material    || '—',
-        crystal:          d.crystal          || '—',
-        movement:         d.movement         || '—',
-        power_reserve:    d.power_reserve    || '—',
-        water_resistance: d.water_resistance || '—',
-        lug_width:        d.lug_width        || '—',
-        dial:             d.dial             || '—',
-        bracelet:         d.bracelet         || '—',
-        description:      d.description      || '',
-      },
+      specs: normalizeSpecs(d),
       ts: Date.now(),
     }
     try {
@@ -95,7 +82,7 @@ export default function AddWatchModal({ open, onClose, currentPage, user, onWatc
 
   return (
     <div className="modal-backdrop open" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal-add">
+      <div className="modal-add" role="dialog" aria-modal="true" aria-label="Add watch">
         <div className="modal-header">
           <div>
             <div className="modal-subtitle">Add to Vault</div>
@@ -165,11 +152,6 @@ export default function AddWatchModal({ open, onClose, currentPage, user, onWatc
           {step === 2 && pendingData && (
             <>
               <div style={{ display:'flex', gap:'16px', marginBottom:'20px', background:'var(--bg3)', border:'1px solid var(--border)', padding:'14px', borderRadius:'1px' }}>
-                {previewImgSrc ? (
-                  <img src={previewImgSrc} alt="" style={{ width:'90px', height:'90px', objectFit:'cover', border:'1px solid var(--border)', borderRadius:'1px', flexShrink:0, background:'var(--bg2)' }} onError={() => setPreviewImgSrc('')} />
-                ) : (
-                  <div style={{ width:'90px', height:'90px', border:'1px solid var(--border)', borderRadius:'1px', flexShrink:0, background:'var(--bg2)' }} />
-                )}
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontFamily:"'Cinzel',serif", fontSize:'9px', letterSpacing:'.35em', color:'var(--gold)', marginBottom:'4px' }}>
                     {pendingData.brand}
